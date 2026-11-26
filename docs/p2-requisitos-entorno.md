@@ -36,7 +36,7 @@ Las versiones están fijadas para que el laboratorio sea reproducible. No hay `r
 ## 4. Topología que debe quedar montada
 
 - **`public-net`**: red `bridge` ordinaria. Conecta al frontend con el exterior y permite la publicación `8080:5000`.
-- **`internal-net`**: red `bridge` con `internal: true` y subnet estática `172.28.0.0/24`. No tiene salida a Internet ni ruta desde el host.
+- **`internal-net`**: red `bridge` declarada con `internal: true` y subnet estática `172.28.0.0/24`. En Docker, esa opción crea una red **aislada respecto del exterior**: los contenedores que **solo** pertenecen a ella pueden comunicarse entre sí dentro de la subnet, pero no tienen salida NAT/masquerade a Internet ni conectividad con otras redes Docker, y no pueden publicar puertos en el host. No debe entenderse como aislamiento absoluto frente al propio host: Docker asigna una dirección al puente, por lo que procesos locales pueden alcanzar esa red; por eso los servicios internos se apoyan además en la ausencia de publicación de puertos. `frontend-service` es la excepción deliberada: al estar también en `public-net`, conserva su propia salida a Internet, pero los servicios internos no la comparten. Las directivas `expose` de `5001` y `80` solo documentan los puertos del contenedor; no crean publicaciones en el host.
 - **`frontend-service`**: pertenece a ambas redes; IP fija `172.28.0.10` en `internal-net`; Flask escucha `0.0.0.0:5000`.
 - **`internal-admin-service`**: solo `internal-net`; `172.28.0.20:5001`; sin publicación de puertos.
 - **`fake-metadata`**: solo `internal-net`; `172.28.0.30:80`; sin publicación de puertos.

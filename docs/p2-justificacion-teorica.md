@@ -25,14 +25,14 @@ La consecuencia es un **agente confuso** (*confused deputy*): el atacante no alc
 
 ### 2.1 ENISA
 
-- **ENISA Threat Landscape 2026** [R6] analiza 8 257 incidentes ocurridos entre el 1 de enero y el 31 de diciembre de 2025. DDoS (51,3 %) y accesos no autorizados (39,5 %) concentran la mayor parte de la actividad registrada; la explotación de vulnerabilidades, incluidas N-day y 0-day, sigue siendo un vector de entrada relevante para el acceso no autorizado (60,4 % **del subconjunto de casos cuyo vector pudo identificarse**, que representa apenas el 5,2 % de esos accesos). Para intrusiones de actores estatales, donde el vector se identificó en ~20 % de los casos, la explotación de vulnerabilidades fue el vector más frecuente (70 % de los identificados) [R6].
+- **ENISA Threat Landscape 2026** [R6] analiza 8 257 incidentes ocurridos entre el 1 de enero y el 31 de diciembre de 2025 (p. 9). Las DDoS (51,3 %) y los accesos no autorizados (39,5 %) son los tipos predominantes tanto en el resumen ejecutivo (p. 7) como en el capítulo de tendencias (p. 11). La explotación de vulnerabilidades, incluidas N-day y 0-day, aparece en el **60,4 % de los accesos no autorizados cuyo vector de entrada pudo identificarse**; ese vector solo se conoció en el **5,2 % de dichos accesos**, y en ese mismo subconjunto la configuración errónea o la exposición accidental representan el 20,7 % (p. 11). En intrusiones de actores estatales el vector se identificó en ~20 % de los casos y, dentro de ese subconjunto, la explotación de vulnerabilidades fue el más frecuente (70 %; p. 60). Denominadores: 8 257 = total de incidentes; 5,2 % y 20,7 % = subconjunto de accesos no autorizados con vector conocido; 70 % = subconjunto de intrusiones estatales con vector conocido.
 - **ENISA Threat Landscape 2025** [R7], con 4 875 incidentes (julio 2024–junio 2025), situó la explotación de vulnerabilidades en el 21,3 % de los vectores de intrusión y las amenazas web en el 27,3 % de las categorías de amenaza.
 
 **Lectura para el laboratorio:** el escenario modelado —un endpoint HTTP público explotado para obtener acceso a servicios internos— pertenece a la categoría «explotación de aplicaciones expuestas», una de las vías de entrada persistentes en el panorama europeo. La segmentación y el parcheo reducen la superficie, pero no sustituyen la validación del destino en la aplicación [R1].
 
 ### 2.2 CrowdStrike
 
-- **2026 Global Threat Report** [R8]: el 42 % de las vulnerabilidades observadas se explotaron antes de su divulgación pública; el 40 % de las vulnerabilidades explotadas por actores China-nexus afectaron a dispositivos de borde; el 82 % de las detecciones fueron *malware-free*, lo que refleja el abuso de identidades y relaciones de confianza para moverse lateralmente. El tiempo medio de *breakout* cayó a 29 minutos.
+- **2026 Global Threat Report** [R8]: el informe registra un **incremento del 42 %** en vulnerabilidades de día cero explotadas antes de su divulgación pública respecto al periodo anterior; no afirma que el 42 % del total de vulnerabilidades fueran explotadas de esa forma. El 40 % de las vulnerabilidades explotadas por actores China-nexus afectaron a dispositivos de borde; el 82 % de las detecciones fueron *malware-free*, lo que refleja el abuso de identidades y relaciones de confianza para moverse lateralmente. El tiempo medio de *breakout* cayó a 29 minutos.
 - **2025 Global Threat Report** [R9]: el 52 % de las vulnerabilidades observadas se relacionaron con acceso inicial; el informe documenta además que los actores obtenían credenciales cloud de fuentes no aseguradas como el **Instance Metadata Service** de máquinas virtuales, práctica ya común en 2023 y que continuó en 2024.
 
 **Lectura para el laboratorio:** la cadena explotada aquí (endpoint público → servicio interno → metadatos) reproduce, en miniatura y con datos ficticios, dos patrones observados por CrowdStrike: explotación de superficie expuesta y recolección de credenciales desde metadatos de instancia.
@@ -45,7 +45,7 @@ La consecuencia es un **agente confuso** (*confused deputy*): el atacante no alc
 | **T1552.005 – Unsecured Credentials: Cloud Instance Metadata API** [R4] | *Credential Access* | Describe el abuso de SSRF en un proxy web público para consultar la API de metadatos y señala `169.254.169.254` como dirección de facto. Sus mitigaciones incluyen restringir el tráfico hacia metadatos y limitar el acceso por red. |
 | **Campaña C0029 – Cutting Edge** [R5] | *Initial Access* | Caso real de SSRF (CVE-2024-21893) encadenado con otras vulnerabilidades en Ivanti Connect Secure para eludir mitigaciones previas. Ilustra que el SSRF suele ser un eslabón, no el impacto final. |
 
-En el laboratorio, `fake-metadata` ocupa el papel de la API de metadatos en `172.28.0.30:80` (no en `169.254.169.254`, porque Docker no garantiza la asignación de esa dirección link-local). La mecánica de abuso es idéntica; la dirección está documentada en `docs/puertos-y-protocolos.md`.
+En el laboratorio, `fake-metadata` **reproduce de forma simplificada el patrón SSRF hacia un servicio de metadatos**, no una implementación idéntica al servicio real de AWS. Se sustituye la dirección link-local `169.254.169.254` por `172.28.0.30:80` porque Docker no garantiza la asignación de aquella, y se sirve un endpoint Flask con respuestas y credenciales inventadas. No hay IMDSv2 (petición `PUT` de token y cabecera `X-aws-ec2-metadata-token`), TTL de sesión, IAM real ni respuesta de AWS: solo se modela la forma de la petición y el hecho de que el frontend pueda alcanzarla. Por tanto, esta sección apoya la justificación del vector, no una replicación funcional del *Instance Metadata Service* de AWS. La dirección usada está documentada en `docs/puertos-y-protocolos.md`.
 
 ## 3. Modelo causal del "punto ciego" de confianza
 
@@ -55,7 +55,7 @@ En el laboratorio, `fake-metadata` ocupa el papel de la API de metadatos en `172
 4. **Confianza implícita.** `internal-admin-service` registra la IP de origen pero **no autentica ni autoriza** ninguna petición. No hay mTLS, token ni verificación de Host. La confianza se delega por completo a la pertenencia a la red.
 5. **Impacto.** Se leen `/admin/users` y `/admin/config` y las credenciales ficticias de `fake-metadata`. El frontend devuelve el cuerpo al atacante, cerrando el ciclo.
 
-La red `internal-net` está declarada con `internal: true`, lo que impide salida a Internet y entrada desde el host; sin embargo, **no filtra el tráfico que el propio frontend emite hacia ella**. Por tanto, la segmentación por sí sola no corrige el fallo: reduce la exposición, pero el nodo que hace las peticiones por cuenta del usuario está dentro del perímetro. La defensa debe combinar allowlist/resolución controlada en la aplicación con autenticación y restricciones de red en los servicios internos (competencia de P4).
+La red `internal-net` está declarada con `internal: true`, lo que aísla a los contenedores que solo pertenecen a ella del exterior y de otras redes Docker; sin embargo, **no filtra el tráfico que el propio frontend emite hacia ella**, porque el frontend también es miembro de esa red. Por tanto, la segmentación por sí sola no corrige el fallo: reduce la exposición, pero el nodo que hace las peticiones por cuenta del usuario está dentro del perímetro. La defensa debe combinar allowlist/resolución controlada en la aplicación con autenticación y restricciones de red en los servicios internos (competencia de P4).
 
 Dos matices adicionales que deben considerarse al diseñar la corrección:
 
@@ -78,16 +78,16 @@ Esta sección cubre la **justificación técnica** (criterio 1): definición nor
 
 ## 6. Referencias
 
-- **[R1]** OWASP. *A10:2021 – Server-Side Request Forgery (SSRF)*. <https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_(SSRF)/>
-- **[R2]** MITRE. *CWE-918: Server-Side Request Forgery*. https://cwe.mitre.org/data/definitions/918.html
-- **[R3]** MITRE ATT&CK. *Exploit Public-Facing Application, T1190*. https://attack.mitre.org/techniques/T1190/
-- **[R4]** MITRE ATT&CK. *Unsecured Credentials: Cloud Instance Metadata API, T1552.005*. https://attack.mitre.org/techniques/T1552/005/
-- **[R5]** MITRE ATT&CK. *Campaign C0029 – Cutting Edge*. https://attack.mitre.org/campaigns/C0029/
-- **[R6]** ENISA. *ENISA Threat Landscape 2026* (septiembre 2026). https://www.enisa.europa.eu/publications/enisa-threat-landscape-2026 · PDF: https://www.enisa.europa.eu/sites/default/files/2026-09/ENISA%20Threat%20Landscape%202026_Final.pdf
-- **[R7]** ENISA. *ENISA Threat Landscape 2025* (octubre 2025). https://www.enisa.europa.eu/publications/enisa-threat-landscape-2025
-- **[R8]** CrowdStrike. *2026 Global Threat Report* (24 febrero 2026). https://www.crowdstrike.com/en-us/global-threat-report/ · resumen: https://www.crowdstrike.com/en-us/press-releases/2026-crowdstrike-global-threat-report
-- **[R9]** CrowdStrike. *2025 Global Threat Report* (27 febrero 2025). https://www.crowdstrike.com/en-us/resources/reports/global-threat-report-executive-summary-2025/
-- **[R10]** OWASP. *Server Side Request Forgery Prevention Cheat Sheet*. https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
-- **[R11]** Repositorio del laboratorio. `docs/puertos-y-protocolos.md` y `lab-environment/docker-compose.yml` (commit `03b49fb`).
+- **[R1]** OWASP Foundation. (2021). *A10:2021 – Server-Side Request Forgery (SSRF)*. <https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_(SSRF)/>
+- **[R2]** MITRE Corporation. (n.d.). *CWE-918: Server-Side Request Forgery* (Versión 5.0). Recuperado el 26 de noviembre de 2026, de https://cwe.mitre.org/data/definitions/918.html
+- **[R3]** MITRE Corporation. (2026, 12 de mayo). *Exploit public-facing application* (T1190). MITRE ATT&CK Enterprise. https://attack.mitre.org/techniques/T1190/
+- **[R4]** MITRE Corporation. (2026, 12 de mayo). *Unsecured credentials: Cloud Instance Metadata API* (T1552.005). MITRE ATT&CK Enterprise. https://attack.mitre.org/techniques/T1552/005/
+- **[R5]** MITRE Corporation. (2026, 31 de julio). *Cutting Edge* (C0029). MITRE ATT&CK. https://attack.mitre.org/campaigns/C0029/
+- **[R6]** European Union Agency for Cybersecurity (ENISA). (2026, 22 de septiembre). *ENISA Threat Landscape 2026*. https://www.enisa.europa.eu/publications/enisa-threat-landscape-2026 (PDF: https://www.enisa.europa.eu/sites/default/files/2026-09/ENISA%20Threat%20Landscape%202026_Final.pdf)
+- **[R7]** European Union Agency for Cybersecurity (ENISA). (2025, 1 de octubre). *ENISA Threat Landscape 2025*. https://www.enisa.europa.eu/publications/enisa-threat-landscape-2025
+- **[R8]** CrowdStrike. (2026, 24 de febrero). *2026 Global Threat Report*. https://www.crowdstrike.com/en-us/global-threat-report/ (Resumen ejecutivo: https://www.crowdstrike.com/en-us/resources/reports/global-threat-report-executive-summary-2026)
+- **[R9]** CrowdStrike. (2025, 27 de febrero). *2025 Global Threat Report: Executive summary*. https://www.crowdstrike.com/en-us/resources/reports/global-threat-report-executive-summary-2025/
+- **[R10]** OWASP Foundation. (n.d.). *Server Side Request Forgery Prevention Cheat Sheet*. OWASP Cheat Sheet Series. Recuperado el 26 de noviembre de 2026, de https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+- **[R11]** valemolina567. (2026, 26 de noviembre). *ssrf-lab-grupo4: docs/puertos-y-protocolos.md y lab-environment/docker-compose.yml* (Commit `03b49fb`) [Repositorio de código]. GitHub. https://github.com/valemolina567/ssrf-lab-grupo4
 
 *Fuentes consultadas el 26 de noviembre de 2026.*
