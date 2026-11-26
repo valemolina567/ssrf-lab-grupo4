@@ -1,0 +1,53 @@
+services:
+  frontend-service:
+    build: ./frontend-service
+    container_name: hardened-frontend
+    ports:
+      - "8080:5000"
+    volumes:
+      - ./certs/ca.crt:/app/certs/ca.crt:ro
+      - ./certs/client.crt:/app/certs/client.crt:ro
+      - ./certs/client.key:/app/certs/client.key:ro
+    networks:
+      - public-net
+      - admin-mtls-net
+    restart: unless-stopped
+
+  internal-admin-service:
+    build: ./internal-admin-service
+    container_name: hardened-internal-admin
+    volumes:
+      - ./certs/ca.crt:/app/certs/ca.crt:ro
+      - ./certs/server.crt:/app/certs/server.crt:ro
+      - ./certs/server.key:/app/certs/server.key:ro
+    networks:
+      admin-mtls-net:
+        ipv4_address: 172.28.10.10
+    restart: unless-stopped
+
+  fake-metadata:
+    image: hashicorp/http-echo:latest
+    container_name: hardened-fake-metadata
+    command: ["-listen=:80", "-text={\"AccessKeyId\":\"ASIAIOSFODNN7EXAMPLE\",\"SecretAccessKey\":\"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\"}"]
+    networks:
+      metadata-isolated-net:
+        ipv4_address: 169.254.169.254
+    restart: unless-stopped
+
+networks:
+  public-net:
+    driver: bridge
+
+  admin-mtls-net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+
+  metadata-isolated-net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 169.254.169.0/24
